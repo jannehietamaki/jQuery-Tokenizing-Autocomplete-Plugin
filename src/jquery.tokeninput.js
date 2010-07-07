@@ -422,10 +422,7 @@
             token_count--;
 
             if (settings.tokenLimit != null) {
-                input_box
-                        .show()
-                        .val("")
-                        .focus();
+                input_box.show().val("").focus();
             }
         }
 
@@ -436,15 +433,11 @@
         }
 
         function show_dropdown_searching () {
-            dropdown
-                    .html("<p>"+settings.searchingText+"</p>")
-                    .show();
+            dropdown.html("<p>"+settings.searchingText+"</p>").show();
         }
 
         function show_dropdown_hint () {
-            dropdown
-                    .html("<p>"+settings.hintText+"</p>")
-                    .show();
+            dropdown.html("<p>"+settings.hintText+"</p>").show();
         }
 
         // Highlight the query part of the search term
@@ -452,26 +445,35 @@
             return value.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + term + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<b>$1</b>");
         }
 
+        function filterResults(results, query) {
+            if(settings.localFilter != null) {
+                filtered = new Array();
+                for(var i in results) {
+                    var item = results[i];
+                    if(settings.localFilter(item, query)) {
+                        filtered.push(item);
+                    }
+                }
+                return filtered;
+            }
+            return results;
+        }
+
         // Populate the results dropdown with some results
-        function populate_dropdown (query, results) {
+        function populate_dropdown (query, rawresults) {
+            results = filterResults(rawresults, query);
             if(results.length) {
                 dropdown.empty();
-                var dropdown_ul = $("<ul>")
-                        .appendTo(dropdown)
-                        .mouseover(function (event) {
+                var dropdown_ul = $("<ul>").appendTo(dropdown).mouseover(function (event) {
                     select_dropdown_item(get_element_from_event(event, "li"));
-                })
-                        .mousedown(function (event) {
+                }).mousedown(function (event) {
                     add_token(get_element_from_event(event, "li"));
                     return false;
-                })
-                        .hide();
+                }).hide();
 
                 for(var i in results) {
                     if (results.hasOwnProperty(i)) {
-                        var this_li = $("<li>"+highlight_term(results[i].name, query)+"</li>")
-                                .appendTo(dropdown_ul);
-
+                        var this_li = $("<li>"+highlight_term(results[i].name, query)+"</li>").appendTo(dropdown_ul);
                         if(i%2) {
                             this_li.addClass(settings.classes.dropdownItem);
                         } else {
@@ -490,9 +492,7 @@
                 dropdown_ul.slideDown("fast");
 
             } else {
-                dropdown
-                        .html("<p>"+settings.noResultsText+"</p>")
-                        .show();
+                dropdown.html("<p>"+settings.noResultsText+"</p>").show();
             }
         }
 
@@ -539,7 +539,12 @@
 
         // Do the actual search
         function run_search(query) {
-            var cached_results = cache.get(query);
+            var cacheKey = query;
+            if(settings.queryParam == null) {
+                cacheKey = "any";
+            }
+
+            var cached_results = cache.get(cacheKey);
             if(cached_results) {
                 populate_dropdown(query, cached_results);
             } else {
@@ -548,15 +553,15 @@
                     if($.isFunction(settings.onResult)) {
                         results = settings.onResult.call(this, results);
                     }
-                    cache.add(query, settings.jsonContainer ? results[settings.jsonContainer] : results);
+                    cache.add(cacheKey, settings.jsonContainer ? results[settings.jsonContainer] : results);
                     populate_dropdown(query, settings.jsonContainer ? results[settings.jsonContainer] : results);
                 };
 
-                if(settings.method == "POST") {
-                    $.post(settings.url + queryStringDelimiter + settings.queryParam + "=" + query, {}, callback, settings.contentType);
-                } else {
-                    $.get(settings.url + queryStringDelimiter + settings.queryParam + "=" + query, {}, callback, settings.contentType);
+                queryUrl = settings.url;
+                if(settings.queryParam != null) {
+                    queryUrl += queryStringDelimiter + settings.queryParam + "=" + query;
                 }
+                $.ajax({ type: settings.method, url: queryUrl,success: callback, dataType: settings.contentType});
             }
         }
     };
